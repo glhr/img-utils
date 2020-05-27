@@ -8,12 +8,13 @@ import cv2
 
 WHITE = (255, 255, 255)
 RED = (255, 0, 0)
+BLACK = (0, 0, 0)
 
 def load_image(path):
     return imread(path)
 
 def save_image(image, path):
-    imsave(path, image)
+    imsave(path, image, check_contrast=False)
 
 def bgr_to_rgb(image):
     rgb = cv2.cvtColor(image, cv2.COLOR_BGR2RGB)

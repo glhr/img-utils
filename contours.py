@@ -31,13 +31,22 @@ class Object:
                 [self.props.bbox[1], self.props.bbox[0]], # top-left point
                 [self.props.bbox[3], self.props.bbox[2]]  # bottom-right point
               ])
-        except Exception as e:
+            self.aspect_ratio = self.props.major_axis_length / self.props.minor_axis_length
+        except Exception as e:  # wasn't able to compute regionprops, therefore contour isn't valid
+            # print(e)
             self.shitty_contour = True
 
     def is_valid(self, constraints=['area']):
+        valid = []
         if not self.shitty_contour:
-            if constraints is not None and 'area' in constraints and (self.area < 2000 or self.area > 100000):
-                return False
+            if constraints is not None:
+                if 'area' in constraints and (self.area < 2000 or self.area > 100000):
+                    valid.append(False)
+                if 'extent' in constraints and (self.extent > 0.9 or self.extent < 0.2):
+                    valid.append(False)
+                if 'aspect_ratio' in constraints and (self.aspect_ratio > 4 or self.aspect_ratio < 0.25):
+                    valid.append(False)
+                return np.all(valid)
             return True
         return False
 
@@ -70,7 +79,6 @@ class Object:
                 print("--> Right? True")
                 return True
             return False
-
 
     def get_image(self, type=np.uint8, range=255):
         return self.image.astype(type)*range
@@ -207,7 +215,26 @@ def filter_objects(objects, constraints=['area'], placement='any'):
         list of valid Objects
 
     """
-    return [object for object in objects if object.is_valid(constraints) and object.has_placement(placement)]
+    valid_objects = [object for object in objects if object.is_valid(constraints) and object.has_placement(placement)]
+    # remove objects with overlapping bounding boxes
+    valid_objects.sort(key=lambda object: object.get_flattened_coords()[1])
+    coords = [object.get_flattened_coords() for object in valid_objects]
+
+    # print(coords)
+    non_overlapping_objects = []
+    for i, _ in enumerate(coords):
+        x2 = 3
+        x1 = 1
+        y2 = 2
+        y1 = 0
+        current = coords[i]
+        prev = coords[i-1]
+        if i > 0:
+            if (prev[x2] <= current[x2]) or not (current[y2] < prev[y2] and current[y1] > prev[y1]):
+                non_overlapping_objects.append(valid_objects[i])
+        else:
+            non_overlapping_objects.append(valid_objects[i])
+    return non_overlapping_objects
 
 
 def get_object_crops(image_orig, transform=True, placement='any'):
@@ -248,7 +275,7 @@ def get_object_crops(image_orig, transform=True, placement='any'):
         for object in objects:
             object.image = image_orig
             object.mask = apply_transform(object.get_mask(type=np.uint8), inverse=True).astype(bool)
-            object.coords = apply_transform(object.coords, coords=True)
+            object.coords = apply_transform(object.coords, coords=True, inverse=True)
             object.img_cropped = object.get_crop(binary=False)
     return objects
 
@@ -256,38 +283,98 @@ def get_object_crops(image_orig, transform=True, placement='any'):
 if __name__ == '__main__':
     import matplotlib.pyplot as plt
 
-    image = io.imread("test/1588369634 test-orig.png")
-    image = apply_transform(image)
+    # image = io.imread("test/1588606928 test-orig.png")
+    image = io.imread("test/contourtest.png")
+    # image = apply_transform(image)
     image = normalize_img(image)
     image_value = get_2d_image(image)
 
-    # Find contours at a constant value of 0.8
-    contours = get_contours(image_value)
-    print("Found {} contours".format(len(contours)))
 
-    # Display the image and plot all contours found
-    fig, ax = plt.subplots(ncols=2, figsize=(8, 3))
-    ax[0].imshow(image)
-    for n, contour in enumerate(contours):
-        ax[0].plot(contour[:, 1], contour[:, 0], linewidth=2)
+    def plot_contour_levels(plot_mask=False):
+        # Display the image and plot all contours found
+        fig, ax = plt.subplots(nrows=4, figsize=(6, 14))
+        for level_count, level in enumerate(np.linspace(0.2, 0.8, 4)):
+            masks = np.zeros_like(image)
+            level = np.around(level, decimals=2)
+            contours = get_contours(image_value, level=level)
+            if not len(contours):
+                print("Level",level,"no contours")
+            objects = filter_objects([Object(contour, image) for contour in contours])
 
-    objects = [Object(contour, image) for contour in contours]
+            if plot_mask:
+                for i, object in enumerate(objects):
+                    # mask = object.get_mask(type=np.uint8, range=255)
+                    mask = object.get_masked_image().astype(float)
+                    # save_image(mask, 'test/{} test-mask{}.png'.format(timestamp, i))
+                    masks += mask
+                if not len(objects):
+                    masks[:,:,:] = 255
+                ax[level_count].imshow(masks.astype(np.uint8))
+                ax[level_count].set_title(" ".format(level))
+            else:
+                ax[level_count].imshow(image_value, cmap='gray')
+                ax[level_count].set_title("Contours for level = {}".format(level))
+                for n, contour in enumerate(contours):
+                    ax[level_count].plot(contour[:, 1], contour[:, 0], linewidth=1.5)
 
-    masked = select_best_object(objects, constraints=["area"]).get_masked_image()
+        # io.imsave("test/mask.png", masks)
+        # ax[1].imshow(masks)
+        for a in ax:
+            a.axis('image')
+            a.set_xticks([])
+            a.set_yticks([])
 
-    io.imsave("test/mask.png", masked)
-    ax[1].imshow(masked)
-    for a in ax:
-        a.axis('image')
-        a.set_xticks([])
-        a.set_yticks([])
+        plt.tight_layout()
+        if plot_mask:
+            plt.savefig('test/contours_plot_sweep_mask.png', dpi=500)
+        else:
+            plt.savefig('test/contours_plot_sweep.png', dpi=500)
+            # plt.show()
 
-    plt.tight_layout()
-    # plt.savefig('test/contours_plot.png', dpi=500)
-    plt.show()
+    def plot_contours():
+        # Display the image and plot all contours found
+        plt.figure(0, figsize=(3.5,2))
+        ax = plt.gca()
+        level = 0.8
+        level = np.around(level, decimals=2)
+        contours = get_contours(image_value, level=level)
+
+        ax.imshow(image)
+        for n, contour in enumerate(contours):
+            ax.plot(contour[:, 1], contour[:, 0], linewidth=0.8, color='k')
+
+        ax.axis('image')
+        ax.set_xticks([])
+        ax.set_yticks([])
+
+        plt.tight_layout()
+        plt.savefig('test/contours_filtering_before.png', dpi=500)
+
+        objects = filter_objects([Object(contour, image) for contour in contours],
+                                 constraints=['area', 'extent', 'aspect_ratio'])
+
+        plt.figure(1, figsize=(3.5,2))
+        ax = plt.gca()
+        ax.imshow(image)
+        for n, object in enumerate(objects):
+            contour = object.contour
+            ax.plot(contour[:, 1], contour[:, 0], linewidth=0.8, color='k')
+
+        # io.imsave("test/mask.png", masks)
+        # ax[1].imshow(masks)
+        ax.axis('image')
+        ax.set_xticks([])
+        ax.set_yticks([])
+        plt.tight_layout()
+        plt.savefig('test/contours_filtering_after.png', dpi=500)
+            # plt.show()
+
+    # plot_contour_levels()
+    # plot_contour_levels(plot_mask=True)
+    plot_contours()
 
     # GET CROP
-
-    image_orig = io.imread("test/1588369634 test-orig.png")
-    objects = get_object_crops(image_orig, transform=True)
-    print([object.coords for object in objects])
+    #
+    # image_orig = io.imread("test/1588369634 test-orig.png")
+    # objects = get_object_crops(image_orig, transform=True)
+    # print([object.coords for object in objects])

@@ -35,9 +35,9 @@ def estimate_transform():
 
 
 def apply_transform(image, tform=DEFAULT_TRANSFORM, coords=False, inverse=False):
-    if inverse:
-        tform = tform.inverse
     if not coords:
+        if inverse:
+            tform = tform.inverse
         warped = tf.warp(image, tform, output_shape=image.shape, preserve_range=True)
         if np.max(image) > 1:
             warped = warped.astype(np.uint8)
@@ -48,10 +48,17 @@ def apply_transform(image, tform=DEFAULT_TRANSFORM, coords=False, inverse=False)
         w = xmax-xmin
         coords = [[xmin, ymin], [xmin+w, ymin], [xmin, ymin+h], [xmin+w, ymin+h]]
         # print(coords)
-        coords = tform(coords)
+        if inverse:
+            coords = tform(coords)
+        else:
+            coords = tform.inverse(coords)
         # print(coords)
-        warped = np.array([  [np.floor(np.min(coords[:,0])), np.floor(np.min(coords[:,1]))],
-                    [np.ceil(np.max(coords[:,0])), np.ceil(np.max(coords[:,1]))]],dtype=int)
+        # print(warped)
+        ymin = np.floor(np.min(coords[:,1]))
+        ymax = np.ceil(np.max(coords[:,1]))
+        xmin = np.floor((coords[0,0] + coords[2,0])/2)
+        xmax = np.floor((coords[1,0] + coords[3,0])/2)
+        warped = np.array([[xmin, ymin], [xmax, ymax]], dtype=int)
         # print(warped)
     return warped
 
