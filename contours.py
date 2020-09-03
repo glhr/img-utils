@@ -4,10 +4,12 @@ import numpy as np
 from skimage import measure
 try:
     from perspective_transform import apply_transform
-    from img import normalize_img, get_2d_image
+    from img import normalize_img, get_2d_image, save_image
+    from timing import get_timestamp
 except ImportError:
     from utils.perspective_transform import apply_transform
-    from utils.img import normalize_img, get_2d_image
+    from utils.img import normalize_img, get_2d_image, save_image
+    from utils.timing import get_timestamp
 
 from skimage.draw import polygon
 from scipy import ndimage
@@ -134,7 +136,7 @@ class Object:
         return mask
 
 
-def get_contours(image, level=0.8):
+def get_contours(image, level=0.4):
     """Find iso-valued contours in a 2D array for a given level value, using skimage's find_contours() method.
 
     Parameters
@@ -284,13 +286,13 @@ if __name__ == '__main__':
     import matplotlib.pyplot as plt
 
     # image = io.imread("test/1588606928 test-orig.png")
-    image = io.imread("test/contourtest.png")
+    image = io.imread("test/ros.png")
     # image = apply_transform(image)
     image = normalize_img(image)
     image_value = get_2d_image(image)
 
 
-    def plot_contour_levels(plot_mask=False):
+    def plot_contour_levels(plot_mask=True):
         # Display the image and plot all contours found
         fig, ax = plt.subplots(nrows=4, figsize=(6, 14))
         for level_count, level in enumerate(np.linspace(0.2, 0.8, 4)):
@@ -305,7 +307,7 @@ if __name__ == '__main__':
                 for i, object in enumerate(objects):
                     # mask = object.get_mask(type=np.uint8, range=255)
                     mask = object.get_masked_image().astype(float)
-                    # save_image(mask, 'test/{} test-mask{}.png'.format(timestamp, i))
+                    save_image(mask, 'test/{} test-mask{}.png'.format(level, i))
                     masks += mask
                 if not len(objects):
                     masks[:,:,:] = 255
@@ -370,8 +372,8 @@ if __name__ == '__main__':
             # plt.show()
 
     # plot_contour_levels()
-    # plot_contour_levels(plot_mask=True)
-    plot_contours()
+    plot_contour_levels(plot_mask=True)
+    # plot_contours()
 
     # GET CROP
     #
