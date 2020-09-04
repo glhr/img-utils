@@ -35,16 +35,23 @@ def adjust_image_range(image, max):
             image = image*255
     return image
 
-def image_to_numpy(msg):
-    dtype_class, channels = (np.uint8, 3)
+def image_to_numpy(msg,channels=3):
+    dtype_class, channels = (np.uint8, channels)
     dtype = np.dtype(dtype_class)
     dtype = dtype.newbyteorder('>' if msg.is_bigendian else '<')
     shape = (msg.height, msg.width, channels)
     try:
         data = np.fromstring(msg.data, dtype=dtype).reshape(shape)
+    except TypeError:
+        try:
+            data = np.array(msg.data).reshape(shape)
+        except ValueError:
+            shape = (msg.height, msg.width)
+            data = np.array(msg.data).reshape(shape)
     except ValueError:
         shape = (msg.height, msg.width, 4)
         data = np.fromstring(msg.data, dtype=dtype).reshape(shape)
+
     return data
 
 
