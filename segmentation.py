@@ -6,7 +6,7 @@ import numpy as np
 import matplotlib.pyplot as plt
 from skimage.exposure import equalize_adapthist
 
-from utils.img import rgb2hsv, rgb2gray, rgb2ycbcr, normalize_img
+from vision_utils.img import rgb2hsv, rgb2gray, rgb2ycbcr, normalize_img
 
 
 def get_segmentation_mask(image):

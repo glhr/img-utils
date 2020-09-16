@@ -1,9 +1,9 @@
 import matplotlib.pyplot as plt
 import numpy as np
 # from skimage.draw import rectangle_perimeter
-from utils.img import *
+from vision_utils.img import *
 from skimage.color import gray2rgb, rgb2hsv
-from utils.contours import Object, get_contours, filter_objects
+from vision_utils.contours import Object, get_contours, filter_objects
 import skimage
 import cv2
 

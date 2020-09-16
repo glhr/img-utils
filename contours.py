@@ -7,9 +7,9 @@ try:
     from img import normalize_img, get_2d_image, save_image
     from timing import get_timestamp
 except ImportError:
-    from utils.perspective_transform import apply_transform
-    from utils.img import normalize_img, get_2d_image, save_image
-    from utils.timing import get_timestamp
+    from vision_utils.perspective_transform import apply_transform
+    from vision_utils.img import normalize_img, get_2d_image, save_image
+    from vision_utils.timing import get_timestamp
 
 from skimage.draw import polygon
 from scipy import ndimage
