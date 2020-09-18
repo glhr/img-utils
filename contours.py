@@ -117,7 +117,7 @@ class Object:
         image = self.image
         assert image.ndim > 2, "get_masked_image: expecting 3-channel image"
         masked = (image.copy()*range).astype(np.uint8)
-        masked[~self.mask,:] = range
+        masked[~self.mask,:] = 0
         assert masked.ndim > 2, "get_masked_image: expecting 3-channel masked output"
 
         return masked
