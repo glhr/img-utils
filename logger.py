@@ -1,5 +1,6 @@
 import coloredlogs
 import logging
+import pprint
 
 # set up logging
 logger = logging.getLogger(__name__)
@@ -12,3 +13,6 @@ coloredlogs.install(
 
 def get_logger():
     return logger
+
+def get_printer():
+    return pprint.PrettyPrinter(depth=2)
