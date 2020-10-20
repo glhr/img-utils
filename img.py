@@ -5,6 +5,8 @@ from skimage.exposure import equalize_hist
 from skimage.transform import resize
 import numpy as np
 import cv2
+from sensor_msgs.msg import Image
+import sys
 
 WHITE = (255, 255, 255)
 RED = (255, 0, 0)
@@ -109,55 +111,42 @@ def image_to_numpy(msg):
 	return data
 
 
+def numpy_to_image(arr, encoding):
+        if not encoding in name_to_dtypes:
+                raise TypeError('Unrecognized encoding {}'.format(encoding))
 
-def numpy_to_image(arr, encoding="rgb8"):
-    name_to_dtypes = {
-       "rgb8":    (np.uint8,  3),
-       "32FC3":   (np.float32, 3),
-       "32FC4":   (np.float32, 4),
-       "64FC3":   (np.float64, 3),
-       "mono8":   (np.uint8,  1),
-    }
-    from sensor_msgs.msg import Image
-    import sys
-    if not (encoding in name_to_dtypes):
-        raise TypeError('Unrecognized encoding {}'.format(encoding))
+        im = Image(encoding=encoding)
 
-    if encoding in ["rgb8", "mono8"]:
-        arr = arr.astype(np.uint8)
-    im = Image(encoding=encoding)
+        # extract width, height, and channels
+        dtype_class, exp_channels = name_to_dtypes[encoding]
+        dtype = np.dtype(dtype_class)
+        if len(arr.shape) == 2:
+                im.height, im.width, channels = arr.shape + (1,)
+        elif len(arr.shape) == 3:
+                im.height, im.width, channels = arr.shape
+        else:
+                raise TypeError("Array must be two or three dimensional")
 
-    # extract width, height, and channels
-    dtype_class, exp_channels = name_to_dtypes[encoding]
-    dtype = np.dtype(dtype_class)
-    if len(arr.shape) == 2:
-        im.height, im.width, channels = arr.shape + (1,)
-    elif len(arr.shape) == 3:
-        im.height, im.width, channels = arr.shape
-    else:
-        raise TypeError("Array must be two or three dimensional")
+        # check type and channels
+        if exp_channels != channels:
+                raise TypeError("Array has {} channels, {} requires {}".format(
+                        channels, encoding, exp_channels
+                ))
+        if dtype_class != arr.dtype.type:
+                raise TypeError("Array is {}, {} requires {}".format(
+                        arr.dtype.type, encoding, dtype_class
+                ))
 
-    # check type and channels
-    if exp_channels != channels:
-        raise TypeError("Array has {} channels, {} requires {}".format(
-           channels, encoding, exp_channels
-        ))
-    if dtype_class != arr.dtype.type:
-        raise TypeError("Array is {}, {} requires {}".format(
-            arr.dtype.type, encoding, dtype_class
-        ))
+        # make the array contiguous in memory, as mostly required by the format
+        contig = np.ascontiguousarray(arr)
+        im.data = contig.tostring()
+        im.step = contig.strides[0]
+        im.is_bigendian = (
+                arr.dtype.byteorder == '>' or
+                arr.dtype.byteorder == '=' and sys.byteorder == 'big'
+        )
 
-    # make the array contiguous in memory, as mostly required by the format
-    contig = np.ascontiguousarray(arr)
-    im.data = contig.tostring()
-    im.step = contig.strides[0]
-    im.is_bigendian = (
-        arr.dtype.byteorder == '>' or
-        arr.dtype.byteorder == '=' and sys.byteorder == 'big'
-    )
-
-    return im
-
+        return im
 
 def normalize_img(image, resize_shape=None):
     if resize_shape is not None:
