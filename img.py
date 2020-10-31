@@ -111,7 +111,7 @@ def image_to_numpy(msg):
 	return data
 
 
-def numpy_to_image(arr, encoding):
+def numpy_to_image(arr, encoding="rgb8"):
         if not encoding in name_to_dtypes:
                 raise TypeError('Unrecognized encoding {}'.format(encoding))
 
