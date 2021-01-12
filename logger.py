@@ -14,5 +14,5 @@ coloredlogs.install(
 def get_logger():
     return logger
 
-def get_printer():
-    return pprint.PrettyPrinter(depth=2)
+def get_printer(depth=2):
+    return pprint.PrettyPrinter(depth=depth)
